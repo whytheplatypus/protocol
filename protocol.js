@@ -4,7 +4,7 @@
         define([], factory);
     } else {
         // Browser globals
-        root.amdWeb = factory();
+        root.Protocol = factory();
     }
 }(this, function () {
     //Builds a protocol
@@ -35,36 +35,61 @@
     var Protocol = function(name, json, stream){
         var protocol = this;
         protocol.name = name;
-        for(var i in json){
-            //send
-            var send = function(data){
-                if(data !instanceof Object){
-                    data = {
-                        message: data
-                        type: i
-                    }
+
+        function createSend(type){
+            console.log(type);
+            function addType(obj){    
+                console.log("adding ", type);
+                if(!(obj instanceof Object)){
+                    obj = {
+                        message: obj,
+                        type: type
+                    };
                 } else {
-                    data.type = i;
+                    obj.type = type;
                 }
-                //change to write if working with nodejs stream
-                stream.send(data);
+                return obj
             }
-            
-            if(json[i].hasOwnProperty('send'))
-                send = function(){
-                    var data = protocol[i].send.call(arguments);
-                    if(data !instanceof Object){
-                        data = {
-                            message: data
-                            type: i
-                        }
-                    } else {
-                        data.type = i;
-                    }
-                    //change to write if working with nodejs stream
-                    stream.send(data);
+            return function(data){
+                addType(data, type);
+                console.log("writing ", data);
+                stream.write(data);
+            };
+        };
+
+        function createExtendedSend(type, send){
+            function addType(obj){    
+                console.log("adding ", type);
+                if(!(obj instanceof Object)){
+                    obj = {
+                        message: obj,
+                        type: type
+                    };
+                } else {
+                    obj.type = type;
                 }
-            protocol[i] = send;
+                return obj
+            }
+
+            return function(){
+                var data = send.call(arguments);
+                addType(data, type);
+                console.log("writing ", data);
+                stream.write(data);
+            };
+        }
+
+        for(var i in json){
+            console.log(i);
+            var type = i;
+
+            
+
+            if(json[type].hasOwnProperty('send')){
+                protocol[type] = createExtendedSend(type, json[type].send);
+            } else {
+                protocol[type] = createSend(type);
+            }
         }
         //recieve
         stream.on('data', function(data){
